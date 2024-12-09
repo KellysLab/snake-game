@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>复古贪吃蛇</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #2c3e50;
+            margin: 0;
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        .game-container {
+            margin-top: 20px;
+            position: relative;
+        }
+
+        #gameCanvas {
+            border: 4px solid #34495e;
+            background: #2c3e50;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        .score-board {
+            color: #ecf0f1;
+            font-size: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .game-over {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #e74c3c;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .start-btn {
+            background: #e74c3c;
+            border: none;
+            padding: 10px 20px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-family: inherit;
+        }
+
+        .start-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="score-board">
+        分数: <span id="score">0</span>
+        <br>
+        最高分: <span id="highScore">0</span>
+    </div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div id="gameOver" class="game-over">
+            游戏结束!
+            <br>
+            <button class="start-btn" onclick="game.restart()">重新开始</button>
+        </div>
+    </div>
+    <script>
+        class Snake {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = 0;
+                this.y = 0;
+                this.dx = 20;
+                this.dy = 0;
+                this.tail = [{x: 0, y: 0}];
+                this.total = 1;
+            }
+
+            update() {
+                for (let i = 0; i < this.tail.length - 1; i++) {
+                    this.tail[i] = {...this.tail[i + 1]};
+                }
+                
+                this.tail[this.total - 1] = {x: this.x, y: this.y};
+                
+                this.x += this.dx;
+                this.y += this.dy;
+            }
+
+            changeDirection(direction) {
+                switch(direction) {
+                    case 'UP':
+                        if (this.dy === 0) {
+                            this.dx = 0;
+                            this.dy = -20;
+                        }
+                        break;
+                    case 'DOWN':
+                        if (this.dy === 0) {
+                            this.dx = 0;
+                            this.dy = 20;
+                        }
+                        break;
+                    case 'LEFT':
+                        if (this.dx === 0) {
+                            this.dx = -20;
+                            this.dy = 0;
+                        }
+                        break;
+                    case 'RIGHT':
+                        if (this.dx === 0) {
+                            this.dx = 20;
+                            this.dy = 0;
+                        }
+                        break;
+                }
+            }
+
+            eat(food) {
+                if (this.x === food.x && this.y === food.y) {
+                    this.total++;
+                    return true;
+                }
+                return false;
+            }
+
+            checkCollision(width, height) {
+                if (this.x < 0 || this.x >= width || this.y < 0 || this.y >= height) {
+                    return true;
+                }
+                
+                for (let i = 0; i < this.tail.length - 1; i++) {
+                    if (this.x === this.tail[i].x && this.y === this.tail[i].y) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            draw(ctx) {
+                ctx.fillStyle = '#2ecc71';
+                for (let i = 0; i < this.tail.length; i++) {
+                    ctx.fillRect(this.tail[i].x, this.tail[i].y, 18, 18);
+                }
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.snake = new Snake();
+                this.food = this.getRandomFood();
+                this.score = 0;
+                this.highScore = localStorage.getItem('snakeHighScore') || 0;
+                this.gameOver = false;
+                this.bindEvents();
+                this.updateHighScore();
+                this.gameLoop();
+            }
+
+            bindEvents() {
+                document.addEventListener('keydown', (e) => {
+                    switch(e.key) {
+                        case 'ArrowUp':
+                            this.snake.changeDirection('UP');
+                            break;
+                        case 'ArrowDown':
+                            this.snake.changeDirection('DOWN');
+                            break;
+                        case 'ArrowLeft':
+                            this.snake.changeDirection('LEFT');
+                            break;
+                        case 'ArrowRight':
+                            this.snake.changeDirection('RIGHT');
+                            break;
+                    }
+                });
+            }
+
+            getRandomFood() {
+                const x = Math.floor(Math.random() * 20) * 20;
+                const y = Math.floor(Math.random() * 20) * 20;
+                return {x, y};
+            }
+
+            update() {
+                if (this.gameOver) return;
+
+                this.snake.update();
+
+                if (this.snake.eat(this.food)) {
+                    this.food = this.getRandomFood();
+                    this.score += 10;
+                    document.getElementById('score').textContent = this.score;
+                    
+                    if (this.score > this.highScore) {
+                        this.highScore = this.score;
+                        this.updateHighScore();
+                        localStorage.setItem('snakeHighScore', this.highScore);
+                    }
+                }
+
+                if (this.snake.checkCollision(this.canvas.width, this.canvas.height)) {
+                    this.gameOver = true;
+                    document.getElementById('gameOver').style.display = 'block';
+                }
+            }
+
+            draw() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 绘制食物
+                this.ctx.fillStyle = '#e74c3c';
+                this.ctx.fillRect(this.food.x, this.food.y, 18, 18);
+                
+                // 绘制蛇
+                this.snake.draw(this.ctx);
+            }
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                setTimeout(() => requestAnimationFrame(() => this.gameLoop()), 100);
+            }
+
+            updateHighScore() {
+                document.getElementById('highScore').textContent = this.highScore;
+            }
+
+            restart() {
+                this.snake.reset();
+                this.food = this.getRandomFood();
+                this.score = 0;
+                document.getElementById('score').textContent = '0';
+                this.gameOver = false;
+                document.getElementById('gameOver').style.display = 'none';
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html> 
